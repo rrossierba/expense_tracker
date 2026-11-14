@@ -1,0 +1,8 @@
+# backend - python/fastapi
+__pycache__
+.venv
+.env
+*_nogit
+docs/
+
+# frontend - javascript/nodejs
