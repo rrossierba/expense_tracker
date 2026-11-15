@@ -1,39 +1,16 @@
-export type AccountType =
-  | "CHECKING"
-  | "SAVINGS"
-  | "CREDIT_CARD"
-  | "CASH"
-  | "INVESTMENT";
+import type { components } from "./generated";
 
-export interface Account {
-  id: string;
-  user_id: string;
-  name: string;
-  type: AccountType;
-  initial_balance: string | number;
-  current_balance: string | number;
-  currency: string;
-  color: string | null;
-  icon: string | null;
-  is_archived: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AccountCreatePayload {
-  name: string;
-  type?: AccountType;
-  initial_balance?: string | number;
-  currency?: string;
-  color?: string | null;
-  icon?: string | null;
-}
-
-export interface AccountUpdatePayload {
-  name?: string;
-  type?: AccountType;
-  color?: string | null;
-  icon?: string | null;
-  is_archived?: boolean;
-}
+export type AccountType = components["schemas"]["AccountType"];
+export type Account = components["schemas"]["AccountResponse"];
+export type AccountCreatePayload = Omit<
+  components["schemas"]["AccountCreate"],
+  "type" | "currency" | "color" | "icon" | "initial_balance"
+> &
+  Partial<
+    Pick<
+      components["schemas"]["AccountCreate"],
+      "type" | "currency" | "color" | "icon" | "initial_balance"
+    >
+  >;
+export type AccountUpdatePayload = components["schemas"]["AccountUpdate"];
 

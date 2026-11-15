@@ -1,28 +1,11 @@
-export interface User {
-  id: string;
-  email: string;
-  base_currency: string;
-  timezone: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import type { components } from "./generated";
 
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-}
-
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export interface RegisterPayload {
-  email: string;
-  password: string;
-  base_currency?: string;
-  timezone?: string;
-}
+export type User = components["schemas"]["UserResponse"];
+export type TokenResponse = components["schemas"]["TokenResponse"];
+export type LoginCredentials = components["schemas"]["UserLogin"];
+export type RegisterPayload = Omit<
+  components["schemas"]["UserCreate"],
+  "base_currency" | "timezone"
+> &
+  Partial<Pick<components["schemas"]["UserCreate"], "base_currency" | "timezone">>;
 

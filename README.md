@@ -78,8 +78,24 @@ Backend:
 
 ```bash
 cd backend
+uv run pytest
 uv run alembic upgrade head
 ```
+
+## API contract types
+
+The backend's FastAPI OpenAPI schema is the source of truth for frontend API
+types. Start the backend, then regenerate the TypeScript contract types when
+backend routes or Pydantic schemas change:
+
+```bash
+cd frontend
+npm run generate:api
+```
+
+This updates `frontend/types/generated.ts`. The domain types in
+`frontend/types/` are aliases over the generated schemas, so API shape changes
+surface as frontend type-checking errors.
 
 ## Configuration
 
