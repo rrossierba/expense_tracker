@@ -4,7 +4,7 @@ __pycache__
 .env
 *_nogit
 docs/
-graphify-out/
+graphify-out/*
 .DS_Store
 
 # frontend - javascript/nodejs
