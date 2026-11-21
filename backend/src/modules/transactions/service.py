@@ -172,6 +172,29 @@ class TransactionService:
                 db, tx_in.category_id, user_id
             )
 
+        effective_type = tx_in.type if tx_in.type is not None else tx.type
+        effective_account_id = (
+            tx_in.account_id if tx_in.account_id is not None else tx.account_id
+        )
+        effective_destination_id = (
+            tx_in.destination_account_id
+            if tx_in.destination_account_id is not None
+            else tx.destination_account_id
+        )
+
+        if effective_type == TransactionType.TRANSFER:
+            if not effective_destination_id:
+                raise BadRequestException(
+                    "destination_account_id is required for transfers"
+                )
+            if effective_account_id == effective_destination_id:
+                raise BadRequestException(
+                    "Source and destination accounts must be different"
+                )
+            await account_service.get_account_by_id(
+                db, effective_destination_id, user_id
+            )
+
         update_data = tx_in.model_dump(exclude_unset=True, exclude={"tag_ids"})
         for field, value in update_data.items():
             setattr(tx, field, value)

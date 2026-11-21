@@ -35,7 +35,7 @@ class CategoryResponse(CategoryBase):
     is_archived: bool
     created_at: datetime
     updated_at: datetime
-    subcategories: list["CategoryResponse"] = []
+    subcategories: list["CategoryResponse"] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

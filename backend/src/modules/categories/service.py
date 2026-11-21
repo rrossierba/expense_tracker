@@ -45,7 +45,7 @@ class CategoryService:
         )
         db.add(category)
         await db.commit()
-        await db.refresh(category)
+        await db.refresh(category, attribute_names=["subcategories"])
         return category
 
     @staticmethod

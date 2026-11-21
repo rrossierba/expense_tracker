@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   ArrowRightLeft,
   ArrowUpRight,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -19,6 +20,7 @@ import type {
   Transaction,
   TransactionCreatePayload,
   TransactionType,
+  TransactionUpdatePayload,
 } from "../../../types/transaction";
 import { useAuth } from "../../../components/providers/auth-provider";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -50,10 +52,17 @@ function localDateTimeValue() {
   return now.toISOString().slice(0, 16);
 }
 
+function dateToLocalInput(value: string) {
+  const date = new Date(value);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 export default function TransactionsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | TransactionType>("ALL");
   const [type, setType] = useState<TransactionType>("EXPENSE");
@@ -100,6 +109,22 @@ export default function TransactionsPage() {
     },
   });
 
+  const updateTransaction = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: TransactionUpdatePayload }) =>
+      api.patch<Transaction>(`/transactions/${id}`, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-categories"] }),
+      ]);
+      setOpen(false);
+      setEditingTransaction(null);
+    },
+  });
+
   const deleteTransaction = useMutation({
     mutationFn: (id: string) => api.delete(`/transactions/${id}`),
     onSuccess: async () => {
@@ -136,7 +161,7 @@ export default function TransactionsPage() {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    createTransaction.mutate({
+    const payload: TransactionUpdatePayload = {
       account_id: accountId,
       destination_account_id: type === "TRANSFER" ? destinationAccountId : null,
       category_id: type === "TRANSFER" || !categoryId ? null : categoryId,
@@ -145,11 +170,38 @@ export default function TransactionsPage() {
       date: new Date(date).toISOString(),
       payee: payee.trim() || null,
       description: description.trim() || null,
-    });
+    };
+
+    if (editingTransaction) {
+      updateTransaction.mutate({ id: editingTransaction.id, payload });
+    } else {
+      createTransaction.mutate(payload as TransactionCreatePayload);
+    }
   };
 
   const openForm = () => {
+    setEditingTransaction(null);
+    setType("EXPENSE");
     setAccountId((current) => current || accountsQuery.data?.[0]?.id || "");
+    setDestinationAccountId("");
+    setCategoryId("");
+    setAmount("");
+    setDate(localDateTimeValue());
+    setPayee("");
+    setDescription("");
+    setOpen(true);
+  };
+
+  const openEditForm = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setType(transaction.type);
+    setAccountId(transaction.account_id);
+    setDestinationAccountId(transaction.destination_account_id ?? "");
+    setCategoryId(transaction.category_id ?? "");
+    setAmount(String(transaction.amount));
+    setDate(dateToLocalInput(transaction.date));
+    setPayee(transaction.payee ?? "");
+    setDescription(transaction.description ?? "");
     setOpen(true);
   };
 
@@ -271,20 +323,31 @@ export default function TransactionsPage() {
                         )}
                       </td>
                       <td className="px-3 py-4">
-                        <button
-                          type="button"
-                          aria-label="Elimina movimento"
-                          title="Elimina"
-                          disabled={deleteTransaction.isPending}
-                          onClick={() => {
-                            if (window.confirm("Eliminare definitivamente questo movimento?")) {
-                              deleteTransaction.mutate(transaction.id);
-                            }
-                          }}
-                          className="rounded-lg p-2 text-gray-300 transition hover:bg-red-50 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex justify-end gap-1">
+                          <button
+                            type="button"
+                            aria-label="Modifica movimento"
+                            title="Modifica"
+                            onClick={() => openEditForm(transaction)}
+                            className="rounded-lg p-2 text-gray-300 transition hover:bg-emerald-50 hover:text-emerald-600"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Elimina movimento"
+                            title="Elimina"
+                            disabled={deleteTransaction.isPending}
+                            onClick={() => {
+                              if (window.confirm("Eliminare definitivamente questo movimento?")) {
+                                deleteTransaction.mutate(transaction.id);
+                              }
+                            }}
+                            className="rounded-lg p-2 text-gray-300 transition hover:bg-red-50 hover:text-red-500"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -297,9 +360,16 @@ export default function TransactionsPage() {
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
-        title="Registra un movimento"
-        description="Il saldo del conto verrà aggiornato al salvataggio."
+        onClose={() => {
+          setOpen(false);
+          setEditingTransaction(null);
+        }}
+        title={editingTransaction ? "Modifica movimento" : "Registra un movimento"}
+        description={
+          editingTransaction
+            ? "Aggiorna i dati del movimento e i saldi verranno ricalcolati."
+            : "Il saldo del conto verrà aggiornato al salvataggio."
+        }
       >
         {!accountsQuery.data?.length ? (
           <ErrorState message="Prima di registrare un movimento devi creare almeno un conto." />
@@ -415,14 +485,41 @@ export default function TransactionsPage() {
               </Field>
             </div>
             <FormError
-              message={createTransaction.isError ? errorMessage(createTransaction.error) : null}
+              message={
+                editingTransaction
+                  ? updateTransaction.isError
+                    ? errorMessage(updateTransaction.error)
+                    : null
+                  : createTransaction.isError
+                    ? errorMessage(createTransaction.error)
+                    : null
+              }
             />
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" className={secondaryButtonClass} onClick={() => setOpen(false)}>
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                onClick={() => {
+                  setOpen(false);
+                  setEditingTransaction(null);
+                }}
+              >
                 Annulla
               </button>
-              <button type="submit" className={primaryButtonClass} disabled={createTransaction.isPending}>
-                {createTransaction.isPending ? "Salvataggio…" : "Salva movimento"}
+              <button
+                type="submit"
+                className={primaryButtonClass}
+                disabled={
+                  editingTransaction ? updateTransaction.isPending : createTransaction.isPending
+                }
+              >
+                {editingTransaction
+                  ? updateTransaction.isPending
+                    ? "Salvataggio…"
+                    : "Aggiorna movimento"
+                  : createTransaction.isPending
+                    ? "Salvataggio…"
+                    : "Salva movimento"}
               </button>
             </div>
           </form>
